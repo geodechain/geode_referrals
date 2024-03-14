@@ -4,7 +4,7 @@ This contract lets users create, administrate and use refferal/affiliate
 programs in the Geode ecosystem.
 */ 
 
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 #[ink::contract]
 mod geode_referrals {
@@ -13,25 +13,12 @@ mod geode_referrals {
     // use ink::prelude::string::String;
     use ink::storage::Mapping;
     use ink::env::hash::{Sha2x256, HashOutput};
-    use openbrush::{
-        contracts::{
-            reentrancy_guard::*,
-            traits::errors::ReentrancyGuardError,
-        },
-        traits::{
-            Storage,
-            ZERO_ADDRESS
-        },
-    };
 
     // PRELIMINARY STORAGE STRUCTURES >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct AccountVector {
         accountvector: Vec<AccountId>,
     }
@@ -44,31 +31,16 @@ mod geode_referrals {
         }
     }
 
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq, Default)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct HashVector {
         hashvector: Vec<Hash>,
     }
 
-    impl Default for HashVector {
-        fn default() -> HashVector {
-            HashVector {
-              hashvector: <Vec<Hash>>::default(),
-            }
-        }
-    }
-
-
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct Claim { 
         program_id: Hash,
         claim_id: Hash,
@@ -96,27 +68,24 @@ mod geode_referrals {
             Claim {
                 program_id: Hash::default(),
                 claim_id: Hash::default(),
-                parent: ZERO_ADDRESS.into(), 
+                parent: AccountId::from([0x0; 32]), 
                 parent_ip: <Vec<u8>>::default(),
-                child: ZERO_ADDRESS.into(),
+                child: AccountId::from([0x0; 32]),
                 child_ip: <Vec<u8>>::default(),
                 timestamp: u64::default(),
-                grandparent: ZERO_ADDRESS.into(),
-                branch: (ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), ZERO_ADDRESS.into()),
+                grandparent: AccountId::from([0x0; 32]),
+                branch: (AccountId::from([0x0; 32]), AccountId::from([0x0; 32]), AccountId::from([0x0; 32])),
                 pay_in: Balance::default(),
-                endorsed_by: ZERO_ADDRESS.into(),
+                endorsed_by: AccountId::from([0x0; 32]),
                 payout_id: Hash::default(),
                 status: u8::default(),
             }
         }
     }
 
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct RewardPayout { 
         payout_id: Hash,
         program_id: Hash,
@@ -137,11 +106,11 @@ mod geode_referrals {
                 payout_id: Hash::default(),
                 program_id: Hash::default(),
                 claim_id: Hash::default(),
-                child_account: ZERO_ADDRESS.into(),
+                child_account: AccountId::from([0x0; 32]),
                 child_payout: Balance::default(),
-                parent_account: ZERO_ADDRESS.into(),
+                parent_account: AccountId::from([0x0; 32]),
                 parent_payout: Balance::default(),
-                grandparent_account: ZERO_ADDRESS.into(),
+                grandparent_account: AccountId::from([0x0; 32]),
                 grandparent_payout: Balance::default(),
                 timestamp: u64::default(),
                 total_payout: Balance::default(),
@@ -149,12 +118,9 @@ mod geode_referrals {
         }
     }
 
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct Branch { 
         branch_id: Hash,
         program_id: Hash,
@@ -166,17 +132,14 @@ mod geode_referrals {
             Branch {
                 branch_id: Hash::default(),
                 program_id: Hash::default(),
-                branch: (ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), ZERO_ADDRESS.into())
+                branch: (AccountId::from([0x0; 32]), AccountId::from([0x0; 32]), AccountId::from([0x0; 32]))
             }
         }
     }
 
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct ProgramDetails { 
         program_id: Hash,
         owner: AccountId,
@@ -204,7 +167,7 @@ mod geode_referrals {
         fn default() -> ProgramDetails {
             ProgramDetails {
                 program_id: Hash::default(),
-                owner: ZERO_ADDRESS.into(),
+                owner: AccountId::from([0x0; 32]),
                 title: <Vec<u8>>::default(),
                 description: <Vec<u8>>::default(),
                 more_info_link: <Vec<u8>>::default(),
@@ -230,12 +193,9 @@ mod geode_referrals {
    
     // STORAGE STRUCTURES FOR PRIMARY GET MESSAGES >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct ProgramPublicDetails { 
         program_id: Hash,
         owner: AccountId,
@@ -255,7 +215,7 @@ mod geode_referrals {
         fn default() -> ProgramPublicDetails {
             ProgramPublicDetails {
                 program_id: Hash::default(),
-                owner: ZERO_ADDRESS.into(),
+                owner: AccountId::from([0x0; 32]),
                 title: <Vec<u8>>::default(),
                 description: <Vec<u8>>::default(),
                 more_info_link: <Vec<u8>>::default(),
@@ -270,30 +230,16 @@ mod geode_referrals {
         }
     }
 
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq, Default)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct BrowseAllPrograms { 
         programs: Vec<ProgramPublicDetails>
     }
 
-    impl Default for BrowseAllPrograms {
-        fn default() -> BrowseAllPrograms {
-            BrowseAllPrograms {
-                programs: <Vec<ProgramPublicDetails>>::default(),
-            }
-        }
-    }
-
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct ViewProgramDetails { 
         program_id: Hash,
         owner: AccountId,
@@ -321,7 +267,7 @@ mod geode_referrals {
         fn default() -> ViewProgramDetails {
             ViewProgramDetails {
                 program_id: Hash::default(),
-                owner: ZERO_ADDRESS.into(),
+                owner: AccountId::from([0x0; 32]),
                 title: <Vec<u8>>::default(),
                 description: <Vec<u8>>::default(),
                 more_info_link: <Vec<u8>>::default(),
@@ -344,30 +290,16 @@ mod geode_referrals {
         }
     }
     
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq, Default)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct ViewMyPrograms {
         programs: Vec<ViewProgramDetails>
     }
 
-    impl Default for ViewMyPrograms {
-        fn default() -> ViewMyPrograms {
-            ViewMyPrograms {
-                programs: <Vec<ViewProgramDetails>>::default()
-            }
-        }
-    }
-
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq, Default)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct UserDataByProgram {
         program_id: Hash,
         title: Vec<u8>,
@@ -385,43 +317,11 @@ mod geode_referrals {
         branches: Vec<Branch>
     }
 
-    impl Default for UserDataByProgram {
-        fn default() -> UserDataByProgram {
-            UserDataByProgram {
-                program_id: Hash::default(),
-                title: <Vec<u8>>::default(),
-                description: <Vec<u8>>::default(),
-                more_info_link: <Vec<u8>>::default(),
-                photo: <Vec<u8>>::default(),
-                first_level_reward: Balance::default(),
-                second_level_reward: Balance::default(),
-                maximum_rewards: u128::default(),
-                rewards_given: u128::default(),
-                owner_approval_required: bool::default(),
-                pay_in_minimum: Balance::default(), 
-                claims: <Vec<Claim>>::default(),
-                payouts: <Vec<RewardPayout>>::default(),
-                branches: <Vec<Branch>>::default()
-            }
-        }
-    }
-
-    #[derive(Clone, scale::Decode, scale::Encode)]
-    #[cfg_attr(feature = "std",
-        derive(ink::storage::traits::StorageLayout, 
-            scale_info::TypeInfo, Debug, PartialEq, Eq
-        )
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq, Default)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    #[cfg_attr(feature = "std",derive(ink::storage::traits::StorageLayout,))]
     pub struct ViewMyActivity {
         activity: Vec<UserDataByProgram>
-    }
-
-    impl Default for ViewMyActivity {
-        fn default() -> ViewMyActivity {
-            ViewMyActivity {
-                activity: <Vec<UserDataByProgram>>::default()
-            }
-        }
     }
 
     
@@ -465,33 +365,22 @@ mod geode_referrals {
 
     // ERROR DEFINITIONS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
-    #[cfg_attr(feature = "std", derive(::scale_info::TypeInfo))]
+    #[derive(Debug, PartialEq, Eq)]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
     pub enum Error {
         // a generic error
         GenericError,
-        // Reentrancy Guard error
-        ReentrancyError(ReentrancyGuardError),
         // insufficient pay in
         InsufficientPayment,
         // payout failed
         PayoutFailed,
     }
 
-    impl From<ReentrancyGuardError> for Error {
-        fn from(error:ReentrancyGuardError) -> Self {
-            Error::ReentrancyError(error)
-        }
-    }
-
 
     // ACTUAL CONTRACT STORAGE STRUCT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     #[ink(storage)]
-    #[derive(Default, Storage)]
     pub struct ContractStorage {
-        #[storage_field]
-        guard: reentrancy_guard::Data,
         account_claims: Mapping<AccountId, HashVector>,
         claim_details: Mapping<Hash, Claim>,
         account_branches: Mapping<AccountId, HashVector>,
@@ -519,7 +408,6 @@ mod geode_referrals {
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {
-                guard: Default::default(),
                 account_claims: Mapping::default(),
                 claim_details: Mapping::default(),
                 account_branches: Mapping::default(),
@@ -544,7 +432,6 @@ mod geode_referrals {
 
         // 1 🟢 Claim
         #[ink(message, payable)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn make_a_claim (&mut self, 
             program_id: Hash,
             parent_ip: Vec<u8>,
@@ -561,7 +448,7 @@ mod geode_referrals {
             if self.all_programs.contains(&program_id) && this_program.active == true {
                 
                 // get the grandparent
-                let mut grand: AccountId = ZERO_ADDRESS.into();
+                let mut grand: AccountId = AccountId::from([0x0; 32]);
                 // If the caller has a parent, use that grandparent instead
                 if self.account_parent.contains(&caller) {
                     grand = self.account_parent.get(&caller).unwrap();
@@ -610,7 +497,7 @@ mod geode_referrals {
                             grandparent: grand,
                             branch: (grand, caller, child),
                             pay_in: amount_paid,
-                            endorsed_by: ZERO_ADDRESS.into(),
+                            endorsed_by: AccountId::from([0x0; 32]),
                             payout_id: Hash::default(),
                             status: 0,
                         };
@@ -618,9 +505,15 @@ mod geode_referrals {
                         // UPDATE STORAGE MAPPINGS...
 
                         // account_claims: Mapping<AccountId, HashVector>
+                        // add this claim to the parent claim set
                         let mut myclaims = self.account_claims.get(&caller).unwrap_or_default();
                         myclaims.hashvector.push(new_claim_id);
                         self.account_claims.insert(&caller, &myclaims);
+                        // add this claim to the child's claim set 
+                        let mut childclaims = self.account_claims.get(&child).unwrap_or_default();
+                        childclaims.hashvector.push(new_claim_id);
+                        self.account_claims.insert(&child, &childclaims);
+
 
                         // claim_details: Mapping<Hash, Claim>
                         self.claim_details.insert(&new_claim_id, &new_claim);
@@ -639,6 +532,7 @@ mod geode_referrals {
                         self.branch_details.insert(&new_branch_id, &new_branch);
 
                         // account_participated_programs: Mapping<AccountId, HashVector>
+                        // add this program to the parent set of programs participated in
                         let mut caller_programs = self.account_participated_programs.get(&caller).unwrap_or_default();
                         if caller_programs.hashvector.contains(&program_id) {
                             // do nothing
@@ -647,6 +541,16 @@ mod geode_referrals {
                             // add this program to the vector
                             caller_programs.hashvector.push(program_id);
                             self.account_participated_programs.insert(&caller, &caller_programs);
+                        }
+                        // add this program to the child set of programs participated in
+                        let mut child_programs = self.account_participated_programs.get(&child).unwrap_or_default();
+                        if child_programs.hashvector.contains(&program_id) {
+                            // do nothing
+                        }
+                        else {
+                            // add this program to the vector
+                            child_programs.hashvector.push(program_id);
+                            self.account_participated_programs.insert(&child, &child_programs);
                         }
 
                         // program_details: Mapping<Hash, Program>
@@ -672,7 +576,6 @@ mod geode_referrals {
 
         // 2 🟢 Endorse
         #[ink(message)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn endorse_a_claim (&mut self, 
             claim_id: Hash,
             caller_ip: Vec<u8>,
@@ -753,7 +656,7 @@ mod geode_referrals {
                         let child_gets: Balance = this_claim.pay_in;
                         let parent_gets: Balance = this_program.first_level_reward;
                         let mut grand_gets: Balance = 0;
-                        if this_claim.grandparent == ZERO_ADDRESS.into() {
+                        if this_claim.grandparent == AccountId::from([0x0; 32]) {
                             // do nothing
                         }
                         else {
@@ -874,7 +777,6 @@ mod geode_referrals {
 
         // 3 🟢 New Program
         #[ink(message, payable)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn new_program (&mut self, 
             title: Vec<u8>,
             description: Vec<u8>,
@@ -967,7 +869,6 @@ mod geode_referrals {
 
         // 4 🟢 Fund Your Program
         #[ink(message, payable)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn fund_your_program (&mut self, 
             program_id: Hash
         ) -> Result<(), Error> {
@@ -997,7 +898,6 @@ mod geode_referrals {
 
         // 5 🟢 Update Your Program
         #[ink(message)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn update_your_program (&mut self, 
             program_id: Hash,
             title: Vec<u8>,
@@ -1057,7 +957,6 @@ mod geode_referrals {
 
         // 6 🟢 Deactivate Your Program
         #[ink(message)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn deactivate_your_program (&mut self, 
             program_id: Hash
         ) -> Result<(), Error> {
@@ -1094,7 +993,6 @@ mod geode_referrals {
 
         // 7 🟢 Reactivate Your Program
         #[ink(message, payable)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn reactivate_your_program (&mut self, 
             program_id: Hash
         ) -> Result<(), Error> {
@@ -1126,7 +1024,6 @@ mod geode_referrals {
 
         // 8 🟢 Approve A Payout
         #[ink(message)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn approve_a_payout (&mut self, 
             claim_id: Hash
         ) -> Result<(), Error> {
@@ -1167,7 +1064,7 @@ mod geode_referrals {
                     // note that the child was already paid when they endorsed
                     let parent_gets: Balance = this_program.first_level_reward;
                     let mut grand_gets: Balance = 0;
-                    if this_claim.grandparent == ZERO_ADDRESS.into() {
+                    if this_claim.grandparent == AccountId::from([0x0; 32]) {
                         // do nothing
                     }
                     else {
@@ -1274,7 +1171,6 @@ mod geode_referrals {
 
         // 9 🟢 Reject A Payout
         #[ink(message)]
-        #[openbrush::modifiers(non_reentrant)]
         pub fn reject_a_payout (&mut self, 
             claim_id: Hash
         ) -> Result<(), Error> {
